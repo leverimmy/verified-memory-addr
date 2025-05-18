@@ -510,3 +510,268 @@ mod test {
         assert_eq!(default_range.end, va!(0));
     }
 }
+
+#[cfg(kani)]
+mod range_proofs {
+    use crate::{AddrRange, MemoryAddr};
+
+    // For simplicity in these proofs, we'll use `usize` as the concrete type `A`
+    // for `AddrRange<A>`. `usize` satisfies the `MemoryAddr` trait bounds
+    // (Copy, From<usize>, Into<usize>, Ord) and has the necessary arithmetic methods.
+
+    #[kani::proof]
+    fn proof_new_valid_range() {
+        let start: usize = kani::any();
+        let end: usize = kani::any();
+        kani::assume(start <= end); // Precondition for a valid range
+
+        let range = AddrRange::new(start, end);
+        assert_eq!(range.start, start, "Range start not initialized correctly.");
+        assert_eq!(range.end, end, "Range end not initialized correctly.");
+    }
+
+    #[kani::proof]
+    #[kani::should_panic] // Matches substring of panic message
+    fn proof_new_panic_on_invalid_range() {
+        let start: usize = kani::any();
+        let end: usize = kani::any();
+        kani::assume(start > end); // Condition to trigger panic
+
+        // To make the panic message content somewhat predictable for Kani's `expected`
+        // (though substring matching is usually fine)
+        // kani::assume(start == 10 && end == 5); // Example specific values
+
+        let _ = AddrRange::new(start, end);
+    }
+
+    #[kani::proof]
+    fn proof_try_new_behavior() {
+        let start: usize = kani::any();
+        let end: usize = kani::any();
+
+        let opt_range = AddrRange::try_new(start, end);
+
+        if start <= end {
+            assert!(opt_range.is_some(), "`try_new` should return Some for valid start <= end.");
+            let range = opt_range.unwrap();
+            assert_eq!(range.start, start);
+            assert_eq!(range.end, end);
+        } else {
+            assert!(opt_range.is_none(), "`try_new` should return None for invalid start > end.");
+        }
+    }
+
+    #[kani::proof]
+    fn proof_from_start_size_valid() {
+        let start: usize = kani::any();
+        let size: usize = kani::any();
+
+        // Precondition: start + size does not overflow
+        if let Some(expected_end) = start.checked_add(size) {
+            let range = AddrRange::from_start_size(start, size);
+            assert_eq!(range.start, start, "from_start_size: start incorrect.");
+            assert_eq!(range.end, expected_end, "from_start_size: end incorrect.");
+            // For A=usize and size: usize, if checked_add succeeds, end >= start.
+            assert!(range.start <= range.end, "from_start_size: valid range invariant failed.");
+        }
+        // The else case (overflow) is covered by the panic test.
+    }
+
+    #[kani::proof]
+    #[kani::should_panic]
+    fn proof_from_start_size_panic_on_overflow() {
+        let start: usize = kani::any();
+        let size: usize = kani::any();
+
+        // Condition: start + size overflows
+        kani::assume(start.checked_add(size).is_none());
+
+        let _ = AddrRange::from_start_size(start, size);
+    }
+
+    #[kani::proof]
+    fn proof_try_from_start_size_behavior() {
+        let start: usize = kani::any();
+        let size: usize = kani::any();
+
+        let opt_range = AddrRange::try_from_start_size(start, size);
+
+        if let Some(expected_end) = start.checked_add(size) {
+            assert!(opt_range.is_some(), "`try_from_start_size` should be Some when no overflow.");
+            let range = opt_range.unwrap();
+            assert_eq!(range.start, start);
+            assert_eq!(range.end, expected_end);
+        } else {
+            assert!(opt_range.is_none(), "`try_from_start_size` should be None on overflow.");
+        }
+    }
+
+    #[kani::proof]
+    fn proof_is_empty_definition() {
+        let start: usize = kani::any();
+        let end: usize = kani::any();
+
+        // `is_empty` can be called on any range, including those from `new_unchecked`.
+        let range = unsafe { AddrRange::new_unchecked(start, end) };
+        assert_eq!(range.is_empty(), start >= end, "is_empty behavior mismatch with definition.");
+    }
+
+    #[kani::proof]
+    fn proof_size_method() {
+        let start: usize = kani::any();
+        let end: usize = kani::any();
+
+        // Test with a valid range (start <= end)
+        kani::assume(start <= end);
+        let valid_range = AddrRange::new(start, end); // Constructor ensures start <= end
+        assert_eq!(valid_range.size(), end.wrapping_sub(start), "size() for valid range.");
+        // For usize and start <= end, wrapping_sub is equivalent to standard subtraction.
+        assert_eq!(valid_range.size(), end - start, "size() for valid range (direct subtraction).");
+
+        // Test with an invalid range (start > end) created via unsafe
+        // Use different symbolic variables to ensure Kani explores this path independently.
+        let inv_start: usize = kani::any();
+        let inv_end: usize = kani::any();
+        kani::assume(inv_start > inv_end);
+        let invalid_range = unsafe { AddrRange::new_unchecked(inv_start, inv_end) };
+        assert_eq!(invalid_range.size(), inv_end.wrapping_sub(inv_start), "size() for invalid range (start > end).");
+    }
+
+    #[kani::proof]
+    fn proof_contains_method() {
+        let r_start: usize = kani::any();
+        let r_end: usize = kani::any();
+        let addr_to_check: usize = kani::any();
+
+        // Test with a valid range
+        kani::assume(r_start <= r_end);
+        let valid_range = AddrRange::new(r_start, r_end);
+        let expected_for_valid = r_start <= addr_to_check && addr_to_check < r_end;
+        assert_eq!(valid_range.contains(addr_to_check), expected_for_valid, "contains() for valid range.");
+
+        // Test with an invalid range (start > end)
+        let inv_start: usize = kani::any();
+        let inv_end: usize = kani::any();
+        kani::assume(inv_start > inv_end);
+        let invalid_range = unsafe { AddrRange::new_unchecked(inv_start, inv_end) };
+        // For an invalid range (e.g., 5..2), `inv_start <= addr && addr < inv_end` is always false.
+        assert!(!invalid_range.contains(addr_to_check), "contains() for invalid range should always be false.");
+    }
+
+    #[kani::proof]
+    fn proof_overlaps_method() {
+        let s1: usize = kani::any();
+        let e1: usize = kani::any();
+        let s2: usize = kani::any();
+        let e2: usize = kani::any();
+
+        // `overlaps` can be called on any ranges, including those from `new_unchecked`.
+        let r1 = unsafe { AddrRange::new_unchecked(s1, e1) };
+        let r2 = unsafe { AddrRange::new_unchecked(s2, e2) };
+
+        let expected_overlap_result = s1 < e2 && s2 < e1;
+        assert_eq!(r1.overlaps(r2), expected_overlap_result, "overlaps() behavior mismatch with definition.");
+        // Verify symmetry
+        assert_eq!(r1.overlaps(r2), r2.overlaps(r1), "overlaps() should be symmetric.");
+
+        // Example: Touching but not overlapping valid ranges (e.g., 0..10 and 10..20)
+        let touch_s1: usize = 0; let touch_e1: usize = 10;
+        let touch_s2: usize = 10; let touch_e2: usize = 20;
+        let r_touch1 = AddrRange::new(touch_s1, touch_e1);
+        let r_touch2 = AddrRange::new(touch_s2, touch_e2);
+        assert!(!r_touch1.overlaps(r_touch2), "Touching ranges (0..10, 10..20) should not overlap by this definition.");
+    }
+
+    #[kani::proof]
+    fn proof_contains_range_method() {
+        let s1: usize = kani::any();
+        let e1: usize = kani::any();
+        let s2: usize = kani::any();
+        let e2: usize = kani::any();
+
+        let r1 = unsafe { AddrRange::new_unchecked(s1, e1) };
+        let r2 = unsafe { AddrRange::new_unchecked(s2, e2) };
+
+        let expected_contains_range_result = s1 <= s2 && e2 <= e1;
+        assert_eq!(r1.contains_range(r2), expected_contains_range_result, "contains_range() behavior mismatch with definition.");
+
+        // Test `contained_in` implicitly via its definition
+        assert_eq!(r2.contained_in(r1), r1.contains_range(r2), "contained_in() should be equivalent to other.contains_range(self).");
+    }
+    
+    #[kani::proof]
+    fn proof_default_impl() {
+        let default_range: AddrRange<usize> = Default::default();
+        assert_eq!(default_range.start, 0, "Default start should be 0.");
+        assert_eq!(default_range.end, 0, "Default end should be 0.");
+        assert!(default_range.is_empty(), "Default range should be empty.");
+    }
+
+    // --- Unsafe constructor proofs ---
+    #[kani::proof]
+    fn proof_new_unchecked_when_contract_met() {
+        let start: usize = kani::any();
+        let end: usize = kani::any();
+        kani::assume(start <= end); // Caller meets the safety contract
+
+        let range = unsafe { AddrRange::new_unchecked(start, end) };
+        assert_eq!(range.start, start);
+        assert_eq!(range.end, end);
+    }
+
+    #[kani::proof]
+    fn proof_new_unchecked_when_contract_violated() {
+        let start: usize = kani::any();
+        let end: usize = kani::any();
+        kani::assume(start > end); // Caller violates safety contract (creates an "invalid" range)
+
+        let range = unsafe { AddrRange::new_unchecked(start, end) };
+        assert_eq!(range.start, start, "start field for unchecked invalid range.");
+        assert_eq!(range.end, end, "end field for unchecked invalid range.");
+        assert!(range.is_empty(), "Invalid range (start > end) should be considered 'empty' by is_empty().");
+    }
+
+    #[kani::proof]
+    fn proof_from_start_size_unchecked_behavior() {
+        let start: usize = kani::any();
+        let size: usize = kani::any();
+
+        // Behavior is defined by `start.wrapping_add(size)` for `end`.
+        let expected_end = start.wrapping_add(size);
+        let range = unsafe { AddrRange::from_start_size_unchecked(start, size) };
+
+        assert_eq!(range.start, start, "from_start_size_unchecked: start incorrect.");
+        assert_eq!(range.end, expected_end, "from_start_size_unchecked: end incorrect (should match wrapping_add).");
+
+        // Check properties if this created an "invalid" range (end wrapped below start)
+        if expected_end < start {
+            assert!(range.is_empty(), "Range from from_start_size_unchecked where end wrapped below start should be 'empty' by is_empty().");
+            assert_ne!(range.size(), expected_end.wrapping_sub(start), "Size calculation for wrapped range might need care in assertion if expected_end is very small, but the direct equality should hold.");
+             assert_eq!(range.size(), expected_end.wrapping_sub(start), "Size calculation for wrapped range.");
+        }
+    }
+
+    // --- Macro proofs ---
+    // Kani verifies the code *after* macro expansion.
+    #[kani::proof]
+    #[kani::should_panic]
+    fn proof_addr_range_macro_panics_on_invalid() {
+        let start: usize = kani::any();
+        let end: usize = kani::any();
+        kani::assume(start > end);
+
+        // Ensure the macro is in scope. If `addr_range` is exported from crate root:
+        let _range: AddrRange<usize> = crate::addr_range!(start..end);
+    }
+
+    #[kani::proof]
+    fn proof_addr_range_macro_valid_input() {
+        let start: usize = kani::any();
+        let end: usize = kani::any();
+        kani::assume(start <= end);
+
+        let range: AddrRange<usize> = crate::addr_range!(start..end);
+        assert_eq!(range.start, start);
+        assert_eq!(range.end, end);
+    }
+}

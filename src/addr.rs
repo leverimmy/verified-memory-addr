@@ -788,7 +788,7 @@ mod test {
 
 #[cfg(kani)]
 mod kani_proofs {
-    use super::*; // Import items from the parent module
+    use crate::{MemoryAddr, PhysAddr, VirtAddr};
 
     fn assume_valid_alignment(align: usize) {
         kani::assume(align > 0 && align.is_power_of_two());
