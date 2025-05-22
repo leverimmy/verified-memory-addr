@@ -1,6 +1,6 @@
 # verified-memory-addr
 
-A verified crate ([memory_addr`](https://github.com/arceos-org/axmm_crates/tree/main/memory_addr)) using [Kani](https://github.com/model-checking/kani).
+A verified crate ([`memory_addr`](https://github.com/arceos-org/axmm_crates/tree/main/memory_addr)) using [Kani](https://github.com/model-checking/kani).
 
 This repository mainly verifies:
 
