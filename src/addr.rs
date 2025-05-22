@@ -787,7 +787,7 @@ mod test {
 }
 
 #[cfg(kani)]
-mod kani_proofs {
+mod addr_proofs {
     use crate::{MemoryAddr, PhysAddr, VirtAddr};
 
     fn assume_valid_alignment(align: usize) {

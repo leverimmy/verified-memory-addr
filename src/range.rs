@@ -735,6 +735,8 @@ mod range_proofs {
     fn proof_from_start_size_unchecked_behavior() {
         let start: usize = kani::any();
         let size: usize = kani::any();
+        // Assume that it won't overflow
+        kani::assume(size <= usize::MAX - start);
 
         // Behavior is defined by `start.wrapping_add(size)` for `end`.
         let expected_end = start.wrapping_add(size);
@@ -747,7 +749,7 @@ mod range_proofs {
         if expected_end < start {
             assert!(range.is_empty(), "Range from from_start_size_unchecked where end wrapped below start should be 'empty' by is_empty().");
             assert_ne!(range.size(), expected_end.wrapping_sub(start), "Size calculation for wrapped range might need care in assertion if expected_end is very small, but the direct equality should hold.");
-             assert_eq!(range.size(), expected_end.wrapping_sub(start), "Size calculation for wrapped range.");
+            assert_eq!(range.size(), expected_end.wrapping_sub(start), "Size calculation for wrapped range.");
         }
     }
 

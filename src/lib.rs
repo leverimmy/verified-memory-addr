@@ -32,7 +32,7 @@ pub const fn align_down(addr: usize, align: usize) -> usize {
 /// The alignment must be a power of two.
 #[inline]
 pub const fn align_up(addr: usize, align: usize) -> usize {
-    (addr + align - 1) & !(align - 1)
+    addr.wrapping_add(align - 1) & !(align - 1)
 }
 
 /// Returns the offset of the address within the alignment.
