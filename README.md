@@ -18,7 +18,31 @@ cargo kani
 
 ## Result
 
+The expected output should be:
+
 ```bash
 Manual Harness Summary:
 Complete - 55 successfully verified harnesses, 0 failures, 55 total.
+```
+
+However, even minor deviations from the expected behavior, such as a miswritten `align_up` function in [lib.rs](./src/lib.rs) like this:
+
+```rust
+#[inline]
+pub const fn align_up(addr: usize, align: usize) -> usize {
+    // should be
+    // addr.wrapping_add(align - 1) & !(align - 1)
+    addr.wrapping_add(align) & !(align - 1)
+}
+```
+
+can lead to verification failures. In such a scenario, Kani's output would highlight the specific failing harnesses:
+
+```bash
+Manual Harness Summary:
+Verification failed for - addr::addr_proofs::proof_align_up
+Verification failed for - lib_proofs::proof_align_up_4k_consistency_and_properties
+Verification failed for - lib_proofs::proof_is_aligned
+Verification failed for - lib_proofs::proof_align_up_assuming_no_sum_overflow
+Complete - 51 successfully verified harnesses, 4 failures, 55 total.
 ```
