@@ -803,9 +803,9 @@ mod addr_proofs {
         let aligned_addr = addr.align_down(align);
         let aligned_addr_val: usize = aligned_addr.into();
 
-        assert!(crate::is_aligned(aligned_addr_val, align), "Result not aligned");
-        assert!(aligned_addr_val <= addr_val, "Align down increased value");
-        assert!(addr_val.wrapping_sub(aligned_addr_val) < align, "Not the largest aligned address <= original");
+        kani::assert(crate::is_aligned(aligned_addr_val, align), "Result not aligned");
+        kani::assert(aligned_addr_val <= addr_val, "Align down increased value");
+        kani::assert(addr_val.wrapping_sub(aligned_addr_val) < align, "Not the largest aligned address <= original");
         if crate::is_aligned(addr_val, align) {
             assert_eq!(aligned_addr_val, addr_val, "Already aligned address changed");
         }
@@ -825,9 +825,9 @@ mod addr_proofs {
         let aligned_addr = addr.align_up(align);
         let aligned_addr_val: usize = aligned_addr.into();
 
-        assert!(crate::is_aligned(aligned_addr_val, align), "Result not aligned");
-        assert!(aligned_addr_val >= addr_val, "Align up decreased value");
-        assert!(aligned_addr_val.wrapping_sub(addr_val) < align, "Not the smallest aligned address >= original");
+        kani::assert(crate::is_aligned(aligned_addr_val, align), "Result not aligned");
+        kani::assert(aligned_addr_val >= addr_val, "Align up decreased value");
+        kani::assert(aligned_addr_val.wrapping_sub(addr_val) < align, "Not the smallest aligned address >= original");
         if crate::is_aligned(addr_val, align) {
             assert_eq!(aligned_addr_val, addr_val, "Already aligned address changed");
         }
@@ -852,7 +852,7 @@ mod addr_proofs {
         let addr = PhysAddr::from(addr_val);
         let offset = addr.align_offset(align);
         assert_eq!(offset, addr_val & (align - 1));
-        assert!(offset < align);
+        kani::assert(offset < align, "Offset should be less than alignment");
     }
 
     #[kani::proof]

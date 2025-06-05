@@ -66,8 +66,6 @@ where
 
 #[cfg(kani)]
 mod iter_proofs {
-    use core::panic;
-
     use crate::{MemoryAddr, PageIter};
 
     // Define a constant for loop unrolling bounds if not using Kani's default
@@ -102,7 +100,7 @@ mod iter_proofs {
         let end_addr: usize = kani::any();
 
         let iter_opt = PageIter::<INVALID_PAGE_SIZE, usize>::new(start_addr, end_addr);
-        assert!(iter_opt.is_none(), "PAGE_SIZE 0 should result in None");
+        kani::assert(iter_opt.is_none(), "PAGE_SIZE 0 should result in None");
     }
 
     #[kani::proof]
@@ -112,7 +110,7 @@ mod iter_proofs {
         let end_addr: usize = kani::any();
 
         let iter_opt = PageIter::<INVALID_PAGE_SIZE, usize>::new(start_addr, end_addr);
-        assert!(iter_opt.is_none(), "Non-power-of-two PAGE_SIZE should result in None");
+        kani::assert(iter_opt.is_none(), "Non-power-of-two PAGE_SIZE should result in None");
     }
 
     #[kani::proof]
@@ -128,7 +126,7 @@ mod iter_proofs {
         let aligned_end_addr = end_addr_val.align_down(TEST_PAGE_SIZE);
 
         let iter_opt = PageIter::<TEST_PAGE_SIZE, usize>::new(unaligned_start_addr, aligned_end_addr);
-        assert!(iter_opt.is_none(), "Unaligned start address should result in None");
+        kani::assert(iter_opt.is_none(), "Unaligned start address should result in None");
     }
 
     #[kani::proof]
@@ -144,7 +142,7 @@ mod iter_proofs {
         let aligned_start_addr = start_addr_val.align_down(TEST_PAGE_SIZE);
 
         let iter_opt = PageIter::<TEST_PAGE_SIZE, usize>::new(aligned_start_addr, unaligned_end_addr);
-        assert!(iter_opt.is_none(), "Unaligned end address should result in None");
+        kani::assert(iter_opt.is_none(), "Unaligned end address should result in None");
     }
 
     // --- Harnesses for Iterator::next ---
@@ -156,7 +154,7 @@ mod iter_proofs {
         let aligned_addr = addr_val.align_down(TEST_PAGE_SIZE);
 
         if let Some(mut iter) = PageIter::<TEST_PAGE_SIZE, usize>::new(aligned_addr, aligned_addr) {
-            assert!(iter.next().is_none(), "Iterator over an empty range (start == end) should yield None immediately");
+            kani::assert(iter.next().is_none(), "Iterator over an empty range (start == end) should yield None immediately");
         } else {
             kani::panic("PageIter::new should succeed for aligned_addr, aligned_addr");
         }
@@ -174,7 +172,7 @@ mod iter_proofs {
         kani::assume(aligned_start > aligned_end); // Key condition
 
         if let Some(mut iter) = PageIter::<TEST_PAGE_SIZE, usize>::new(aligned_start, aligned_end) {
-            assert!(iter.next().is_none(), "Iterator with start > end should yield None immediately");
+            kani::assert(iter.next().is_none(), "Iterator with start > end should yield None immediately");
         } else {
             kani::panic("PageIter::new should succeed for aligned start > aligned end");
         }
@@ -225,7 +223,7 @@ mod iter_proofs {
                     model_current_addr = next_model_addr;
 
                 } else { // model_current_addr >= initial_end
-                    assert!(iter_item.is_none(), "Iterator should be exhausted when model expects exhaustion");
+                    kani::assert(iter_item.is_none(), "Iterator should be exhausted when model expects exhaustion");
                 }
             }
         } else {

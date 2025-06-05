@@ -117,14 +117,14 @@ mod lib_proofs {
         let result = align_down(addr, align);
 
         // Property 1: The result must be aligned to 'align'.
-        assert!(is_aligned(result, align), "align_down: result is not aligned");
+        kani::assert(is_aligned(result, align), "align_down: result is not aligned");
 
         // Property 2: The result must be less than or equal to the original address.
-        assert!(result <= addr, "align_down: result is greater than original address");
+        kani::assert(result <= addr, "align_down: result is greater than original address");
 
         // Property 3: The result is the largest aligned address less than or equal to 'addr'.
         // This means (addr - result) must be less than 'align'.
-        assert!(addr.wrapping_sub(result) < align, "align_down: result is not the largest aligned address <= addr");
+        kani::assert(addr.wrapping_sub(result) < align, "align_down: result is not the largest aligned address <= addr");
 
         // Property 4: Idempotence - if 'addr' is already aligned, it should not change.
         if is_aligned(addr, align) {
@@ -146,14 +146,14 @@ mod lib_proofs {
         let result = align_up(addr, align);
 
         // Property 1: The result must be aligned to 'align'.
-        assert!(is_aligned(result, align), "align_up: result is not aligned");
+        kani::assert(is_aligned(result, align), "align_up: result is not aligned");
 
         // Property 2: The result must be greater than or equal to the original address.
-        assert!(result >= addr, "align_up: result is smaller than original address (no sum overflow case)");
+        kani::assert(result >= addr, "align_up: result is smaller than original address (no sum overflow case)");
 
         // Property 3: The result is the smallest aligned address greater than or equal to 'addr'.
         // This means (result - addr) must be less than 'align'.
-        assert!(result.wrapping_sub(addr) < align, "align_up: result is not the smallest aligned address >= addr (no sum overflow case)");
+        kani::assert(result.wrapping_sub(addr) < align, "align_up: result is not the smallest aligned address >= addr (no sum overflow case)");
 
         // Property 4: Idempotence - if 'addr' is already aligned, it should not change.
         if is_aligned(addr, align) {
@@ -178,13 +178,13 @@ mod lib_proofs {
         let result = align_up(addr, align);
 
         // Property 1 (alignment) should still hold due to the bitwise mask.
-        assert!(is_aligned(result, align), "align_up: result (with sum overflow) should still be aligned");
+        kani::assert(is_aligned(result, align), "align_up: result (with sum overflow) should still be aligned");
 
         // Property 2 (result >= addr) is expected to FAIL under these overflow conditions.
         // When `addr + align - 1` overflows, it wraps to a small number.
         // `result` (derived from this small wrapped number) will also be small.
         // Thus, `result` will likely be less than the original large `addr`.
-        assert!(result < addr, "align_up: expected result < addr when addr + align - 1 overflows and addr is large");
+        kani::assert(result < addr, "align_up: expected result < addr when addr + align - 1 overflows and addr is large");
     }
 
     #[kani::proof]
@@ -196,11 +196,11 @@ mod lib_proofs {
         let offset = align_offset(addr, align);
 
         // Property 1: The offset must be less than 'align'.
-        assert!(offset < align, "align_offset: result is not less than align");
+        kani::assert(offset < align, "align_offset: result is not less than align");
 
         // Property 2: (addr - offset) must be aligned to 'align'.
         // This means addr = N*align + offset.
-        assert!(is_aligned(addr.wrapping_sub(offset), align), "align_offset: (addr - offset) is not aligned");
+        kani::assert(is_aligned(addr.wrapping_sub(offset), align), "align_offset: (addr - offset) is not aligned");
 
         // Property 3: Equivalence: addr - offset == align_down(addr, align)
         assert_eq!(addr.wrapping_sub(offset), align_down(addr, align), "align_offset: (addr - offset) != align_down(addr, align)");
@@ -227,7 +227,7 @@ mod lib_proofs {
         } else {
         // Property 3: If is_aligned is false, align_down should decrease addr (unless addr is 0).
             if addr != 0 {
-                assert!(align_down(addr, align) < addr, "is_aligned false, but align_down did not decrease addr (addr != 0)");
+                kani::assert(align_down(addr, align) < addr, "is_aligned false, but align_down did not decrease addr (addr != 0)");
             } else {
                 assert_eq!(align_down(0, align), 0, "align_down(0, align) should be 0");
             }
@@ -235,7 +235,7 @@ mod lib_proofs {
             let align_minus_1 = align - 1;
             if addr <= usize::MAX - align_minus_1 { // For align_up without sum overflow
                  // Also ensure addr is not already at max possible aligned value if align_up would make it wrap
-                assert!(align_up(addr, align) > addr, "is_aligned false, but align_up did not increase addr (no sum overflow case)");
+                kani::assert(align_up(addr, align) > addr, "is_aligned false, but align_up did not increase addr (no sum overflow case)");
             }
         }
     }
@@ -259,9 +259,9 @@ mod lib_proofs {
         let align_minus_1 = PAGE_SIZE_4K - 1;
         if addr <= usize::MAX - align_minus_1 {
             let result = align_up_4k(addr);
-            assert!(is_aligned_4k(result), "align_up_4k: result not 4k-aligned");
-            assert!(result >= addr, "align_up_4k: result < addr");
-            assert!(result.wrapping_sub(addr) < PAGE_SIZE_4K, "align_up_4k: result not smallest 4k-aligned >= addr");
+            kani::assert(is_aligned_4k(result), "align_up_4k: result not 4k-aligned");
+            kani::assert(result >= addr, "align_up_4k: result < addr");
+            kani::assert(result.wrapping_sub(addr) < PAGE_SIZE_4K, "align_up_4k: result not smallest 4k-aligned >= addr");
         }
     }
 
